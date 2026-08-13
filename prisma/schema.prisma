@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum LocationType {
+  VILLAGE
+  WARD
+  BLOCK
+}
+
+enum ReportSource {
+  WHATSAPP
+  IVR
+  DASHBOARD
+  HEALTH_WORKER
+  SIMULATION
+}
+
+enum RiskLevel {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum WaterSourceType {
+  HAND_PUMP
+  TUBE_WELL
+  POND
+  MUNICIPAL_TAP
+  TANKER
+  PRIVATE_WELL
+}
+
+enum WaterSourceStatus {
+  NORMAL
+  WATCH
+  SUSPECTED
+  CONTAMINATED
+}
+
+model Location {
+  id                 String                @id @default(cuid())
+  name               String
+  district           String
+  state              String                @default("West Bengal")
+  type               LocationType
+  latitude           Decimal               @db.Decimal(9, 6)
+  longitude          Decimal               @db.Decimal(9, 6)
+  population         Int
+  households         Int
+  baselineDailyCases Decimal               @default(1.4) @db.Decimal(6, 2)
+  vulnerabilityIndex Decimal               @default(0.35) @db.Decimal(4, 2)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  reports            SymptomReport[]
+  rainfall           RainfallObservation[]
+  riskScores         RiskScore[]
+  alerts             Alert[]
+  waterSources       WaterSource[]
+
+  @@index([district, type])
+}
+
+model WaterSource {
+  id             String            @id @default(cuid())
+  locationId     String
+  name           String
+  type           WaterSourceType
+  status         WaterSourceStatus @default(NORMAL)
+  lastInspectedAt DateTime?
+  notes          String?
+  location       Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  reports        SymptomReport[]
+
+  @@index([locationId, status])
+}
+
+model SymptomReport {
+  id               String       @id @default(cuid())
+  locationId       String
+  waterSourceId    String?
+  source           ReportSource
+  phoneHash        String?
+  reporterName     String?
+  ageBand          String?
+  symptoms         String[]
+  severity         Int          @default(2)
+  onsetAt          DateTime
+  reportedAt       DateTime     @default(now())
+  latitude         Decimal?     @db.Decimal(9, 6)
+  longitude        Decimal?     @db.Decimal(9, 6)
+  notes            String?
+  duplicateOfId    String?
+  location         Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  waterSource      WaterSource? @relation(fields: [waterSourceId], references: [id], onDelete: SetNull)
+
+  @@index([locationId, reportedAt])
+  @@index([phoneHash, reportedAt])
+  @@index([waterSourceId])
+}
+
+model RainfallObservation {
+  id          String   @id @default(cuid())
+  locationId  String
+  observedAt  DateTime
+  rainfallMm  Decimal  @db.Decimal(7, 2)
+  source      String   @default("synthetic-imd")
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, observedAt])
+  @@index([locationId, observedAt])
+}
+
+model RiskScore {
+  id          String    @id @default(cuid())
+  locationId  String
+  score       Int
+  level       RiskLevel
+  windowHours Int       @default(72)
+  factors     Json
+  reasoning   String
+  computedAt  DateTime  @default(now())
+  location    Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  alerts      Alert[]
+
+  @@index([locationId, computedAt])
+}
+
+model Alert {
+  id             String      @id @default(cuid())
+  locationId     String
+  riskScoreId    String?
+  status         AlertStatus @default(OPEN)
+  level          RiskLevel
+  score          Int
+  title          String
+  message        String
+  recommendedAction String
+  triggeredAt    DateTime    @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  location       Location    @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  riskScore      RiskScore?  @relation(fields: [riskScoreId], references: [id], onDelete: SetNull)
+
+  @@index([status, triggeredAt])
+  @@index([locationId, status])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, createdAt])
+}
