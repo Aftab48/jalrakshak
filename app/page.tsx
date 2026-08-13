@@ -15,6 +15,19 @@ const levelClass: Record<string, string> = {
 
 export default async function Home() {
   const data = await getDashboardData();
+  const plottedLocations = data.locations.map((location) => {
+    const score = data.latestByLocation.get(location.id);
+    return {
+      id: location.id,
+      name: location.name,
+      district: location.district,
+      type: location.type,
+      latitude: Number(location.latitude),
+      longitude: Number(location.longitude),
+      score: score?.score ?? 0,
+      level: score?.level ?? "LOW",
+    };
+  });
 
   return (
     <main className="app-shell">
@@ -64,15 +77,37 @@ export default async function Home() {
               <span>{data.metrics.highCount + data.metrics.criticalCount} zones need verification</span>
             </div>
 
-            <div className="risk-map">
-              {data.locations.map((location, index) => {
-                const score = data.latestByLocation.get(location.id);
-                const level = score?.level ?? "LOW";
+            <div className="geo-map" aria-label="Geographic risk map of monitored locations">
+              <svg className="geo-base" viewBox="0 0 100 64" role="img" aria-hidden="true">
+                <path className="river" d="M4 42 C16 35 24 41 35 34 C47 26 54 32 64 23 C75 14 84 19 96 10" />
+                <path className="road primary" d="M10 18 C26 18 34 24 47 25 C61 26 72 31 89 29" />
+                <path className="road" d="M19 52 C31 45 42 44 56 40 C69 36 76 43 90 39" />
+                <path className="road" d="M30 8 C37 20 43 29 52 39 C60 48 69 52 82 58" />
+                <path className="district-shape" d="M14 13 L46 7 L72 15 L91 36 L74 57 L39 55 L10 44 Z" />
+              </svg>
+
+              {plottedLocations.map((location) => {
+                const position = getMapPosition(location.latitude, location.longitude);
                 return (
-                  <article className={`map-cell ${level.toLowerCase()}`} key={location.id} style={{ "--i": index } as React.CSSProperties}>
-                    <span>{location.type.toLowerCase()}</span>
-                    <strong>{location.name}</strong>
-                    <b>{score?.score ?? 0}</b>
+                  <article
+                    className={`map-marker ${location.level.toLowerCase()}`}
+                    key={location.id}
+                    style={
+                      {
+                        "--x": `${position.x}%`,
+                        "--y": `${position.y}%`,
+                        "--size": `${Math.max(18, Math.min(38, 16 + location.score / 3))}px`,
+                      } as React.CSSProperties
+                    }
+                    aria-label={`${location.name}, ${location.level.toLowerCase()} risk, score ${location.score}`}
+                  >
+                    <span>{location.score}</span>
+                    <div>
+                      <strong>{location.name}</strong>
+                      <small>
+                        {location.district} · {location.type.toLowerCase()}
+                      </small>
+                    </div>
                   </article>
                 );
               })}
@@ -175,6 +210,22 @@ export default async function Home() {
       </section>
     </main>
   );
+}
+
+function getMapPosition(latitude: number, longitude: number) {
+  const bounds = {
+    north: 22.62,
+    south: 22.45,
+    west: 88.08,
+    east: 88.44,
+  };
+  const x = ((longitude - bounds.west) / (bounds.east - bounds.west)) * 88 + 6;
+  const y = ((bounds.north - latitude) / (bounds.north - bounds.south)) * 52 + 6;
+
+  return {
+    x: Math.min(94, Math.max(6, x)),
+    y: Math.min(58, Math.max(6, y)),
+  };
 }
 
 function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
