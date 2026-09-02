@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from "date-fns";
 import { Activity, Bell, Droplets, MapPin, RefreshCw, ShieldAlert } from "lucide-react";
 import { acknowledgeAlert, recalculateRiskAction, resolveAlert } from "./actions";
+import { InteractiveRiskMap, type PlottedLocation } from "./components/interactive-risk-map";
 import { ReportForm } from "./components/report-form";
 import { WhatIfSimulator } from "./components/what-if-simulator";
 import { ScenarioRunner } from "./components/scenario-runner";
@@ -38,8 +39,28 @@ function levelForWarning(warning: string) {
 
 export default async function Home() {
   const data = await getDashboardData();
-  const plottedLocations = data.locations.map((location) => {
+  const plottedLocations: PlottedLocation[] = data.locations.map((location) => {
     const score = data.latestByLocation.get(location.id);
+    const waterIntel = data.waterIntelligence.filter((w) => w.locationId === location.id);
+    const locationAlerts = data.openAlerts
+      .filter((a) => a.locationId === location.id)
+      .map((a) => ({
+        id: a.id,
+        title: a.title,
+        message: a.message,
+        level: a.level,
+        priority: a.priority,
+        warningLevel: a.warningLevel,
+        status: a.status,
+        recommendedAction: a.recommendedAction,
+        triggeredAt: a.triggeredAt,
+      }));
+    const rawMetrics = score?.rawMetrics as {
+      rainfall72h?: number;
+      reasons?: string[];
+      recommendedAction?: string[];
+    } | null;
+
     return {
       id: location.id,
       name: location.name,
@@ -47,10 +68,39 @@ export default async function Home() {
       type: location.type,
       latitude: Number(location.latitude),
       longitude: Number(location.longitude),
+      population: location.population,
+      households: location.households,
+      vulnerabilityIndex: Number(location.vulnerabilityIndex),
+      baselineDailyCases: Number(location.baselineDailyCases),
       score: score?.score ?? 0,
       level: score?.level ?? "LOW",
       warningLevel: score?.warningLevel ?? "NORMAL",
       priority: score?.priority ?? "P3",
+      confidence: score?.confidence ?? 50,
+      dominantSyndrome: score?.dominantSyndrome && score.dominantSyndrome !== "none" ? score.dominantSyndrome : null,
+      reasoning: score?.reasoning ?? "Routine baseline surveillance active.",
+      factors: (score?.factors as Record<string, number>) ?? {},
+      reasons: rawMetrics?.reasons ?? [],
+      recommendedAction: rawMetrics?.recommendedAction ?? [],
+      rainfall72h: rawMetrics?.rainfall72h ?? waterIntel[0]?.rainfallMm72h ?? 0,
+      reportsCount24h: data.reports.filter((r) => r.locationId === location.id).length,
+      waterSources: location.waterSources.map((source) => {
+        const intel = waterIntel.find((w) => w.id === source.id);
+        return {
+          id: source.id,
+          name: source.name,
+          type: source.type,
+          status: source.status,
+          waterRisk: intel?.waterRisk,
+          warningLevel: intel?.warningLevel,
+          turbidityNTU: intel?.turbidityNTU ?? null,
+          freeChlorine: intel?.freeChlorine ?? null,
+          ecoliDetected: intel?.ecoliDetected ?? null,
+          inspectionScore: intel?.inspectionScore ?? null,
+          reasons: intel?.reasons ?? [],
+        };
+      }),
+      alerts: locationAlerts,
     };
   });
 
@@ -99,47 +149,13 @@ export default async function Home() {
           <div className="map-panel" id="map">
             <div className="panel-heading">
               <div>
-                <p className="section-kicker">Risk geography</p>
+                <p className="section-kicker">Risk geography & active surveillance</p>
                 <h2>Howrah and Kolkata pilot belt</h2>
               </div>
               <span>{data.metrics.highCount + data.metrics.criticalCount} zones need verification</span>
             </div>
 
-            <div className="geo-map" aria-label="Geographic risk map of monitored locations">
-              <svg className="geo-base" viewBox="0 0 100 64" role="img" aria-hidden="true">
-                <path className="river" d="M4 42 C16 35 24 41 35 34 C47 26 54 32 64 23 C75 14 84 19 96 10" />
-                <path className="road primary" d="M10 18 C26 18 34 24 47 25 C61 26 72 31 89 29" />
-                <path className="road" d="M19 52 C31 45 42 44 56 40 C69 36 76 43 90 39" />
-                <path className="road" d="M30 8 C37 20 43 29 52 39 C60 48 69 52 82 58" />
-                <path className="district-shape" d="M14 13 L46 7 L72 15 L91 36 L74 57 L39 55 L10 44 Z" />
-              </svg>
-
-              {plottedLocations.map((location) => {
-                const position = getMapPosition(location.latitude, location.longitude);
-                return (
-                  <article
-                    className={`map-marker ${location.level.toLowerCase()} ring-${location.warningLevel.toLowerCase()}`}
-                    key={location.id}
-                    style={
-                      {
-                        "--x": `${position.x}%`,
-                        "--y": `${position.y}%`,
-                        "--size": `${Math.max(18, Math.min(38, 16 + location.score / 3))}px`,
-                      } as React.CSSProperties
-                    }
-                    aria-label={`${location.name}, ${location.warningLevel.toLowerCase()}, score ${location.score}`}
-                  >
-                    <span>{location.score}</span>
-                    <div>
-                      <strong>{location.name}</strong>
-                      <small>
-                        {location.district} · {location.warningLevel.replace("_", " ")} · {location.priority}
-                      </small>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+            <InteractiveRiskMap locations={plottedLocations} />
           </div>
 
           <div className="alerts-panel" id="alerts">
@@ -309,21 +325,6 @@ const FACTOR_LABELS = [
   ["exposure", "Population exposure"],
 ] as const;
 
-function getMapPosition(latitude: number, longitude: number) {
-  const bounds = {
-    north: 22.62,
-    south: 22.45,
-    west: 88.08,
-    east: 88.44,
-  };
-  const x = ((longitude - bounds.west) / (bounds.east - bounds.west)) * 88 + 6;
-  const y = ((bounds.north - latitude) / (bounds.north - bounds.south)) * 52 + 6;
-
-  return {
-    x: Math.min(94, Math.max(6, x)),
-    y: Math.min(58, Math.max(6, y)),
-  };
-}
 
 function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
