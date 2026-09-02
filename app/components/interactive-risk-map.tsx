@@ -120,7 +120,7 @@ function getMapPosition(latitude: number, longitude: number) {
   };
 }
 
-export function InteractiveRiskMap({ locations }: InteractiveRiskMapProps) {
+export function InteractiveRiskMap({ locations, onSelectLocationForSimulator }: InteractiveRiskMapProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -526,6 +526,7 @@ export function InteractiveRiskMap({ locations }: InteractiveRiskMapProps) {
                       } else {
                         setSelectedId(location.id);
                         setActiveTab("overview");
+                        onSelectLocationForSimulator?.(location.id);
                       }
                     }}
                     onMouseEnter={() => setHoveredId(location.id)}
@@ -853,17 +854,18 @@ export function InteractiveRiskMap({ locations }: InteractiveRiskMapProps) {
               <Activity size={15} />
               Report Case for this Zone
             </button>
-            <a
-              href="#what-if"
+            <button
+              type="button"
               className="footer-action-btn secondary"
               onClick={() => {
+                onSelectLocationForSimulator?.(selectedLocation.id);
                 const whatIf = document.querySelector(".control-panel");
                 if (whatIf) whatIf.scrollIntoView({ behavior: "smooth" });
               }}
             >
               <Sparkles size={15} />
               Simulate in What-If
-            </a>
+            </button>
           </div>
         </aside>
       )}

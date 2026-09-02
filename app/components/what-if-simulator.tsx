@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 
 
 import { Play, Sparkles } from "lucide-react";
@@ -43,6 +43,12 @@ export function WhatIfSimulator({
 }) {
   const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
   const currentLocId = selectedLocId ?? locationId ?? locations[0]?.id;
+
+  // When the parent-supplied locationId changes (global scope switch or map
+  // selection), discard the stale local override so the prop takes effect.
+  useEffect(() => {
+    setSelectedLocId(null);
+  }, [locationId]);
   const [preset, setPreset] = useState<ScenarioId | "CUSTOM">("CUSTOM");
   const [adjustments, setAdjustments] = useState<WhatIfAdjustments>({ ...DEFAULT_WHAT_IF });
   const [result, setResult] = useState<WhatIfResult | null>(null);

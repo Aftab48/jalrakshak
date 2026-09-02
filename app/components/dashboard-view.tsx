@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Activity,
@@ -246,8 +246,17 @@ export function DashboardView({
     return "All Pilot Belts";
   }, [selectedFilter, externalRegion, locations]);
 
-  // Target Location ID for Simulator/Runner
-  const targetLocationId = activeLocations[0]?.id ?? locations[0]?.id;
+  // Simulator target location — updated by map marker clicks or resets when scope changes
+  const [selectedSimLocationId, setSelectedSimLocationId] = useState<string | undefined>(undefined);
+
+  // Reset simulator selection whenever the active scope changes so a stale map
+  // pick from a previous district/location filter cannot bleed through.
+  useEffect(() => {
+    setSelectedSimLocationId(undefined);
+  }, [selectedFilter]);
+
+  // Target Location ID for Simulator/Runner — map pick wins, then scope default
+  const targetLocationId = selectedSimLocationId ?? activeLocations[0]?.id ?? locations[0]?.id;
 
   return (
     <main className="app-shell">
@@ -447,6 +456,7 @@ export function DashboardView({
 
             <InteractiveRiskMap
               locations={activeLocations.length > 0 ? activeLocations : locations}
+              onSelectLocationForSimulator={setSelectedSimLocationId}
             />
           </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { FlaskConical } from "lucide-react";
 import { runSimulationScenarioAction, type ScenarioActionState } from "../actions";
 import { SCENARIOS, type ScenarioId } from "@/lib/simulation-presets";
@@ -16,6 +16,12 @@ export function ScenarioRunner({
 }) {
   const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
   const currentLocId = selectedLocId ?? locationId ?? locations[0]?.id;
+
+  // When the parent-supplied locationId changes (global scope switch or map
+  // selection), discard the stale local override so the prop takes effect.
+  useEffect(() => {
+    setSelectedLocId(null);
+  }, [locationId]);
   const [scenario, setScenario] = useState<ScenarioId>("TRUE_OUTBREAK");
   const [state, setState] = useState<ScenarioActionState>(initialState);
   const [pending, startTransition] = useTransition();

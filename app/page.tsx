@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const data = await getDashboardData();
+  const cutoff24h = new Date(Date.now() - 24 * 3_600_000);
   const plottedLocations: PlottedLocation[] = data.locations.map((location) => {
     const score = data.latestByLocation.get(location.id);
     const waterIntel = data.waterIntelligence.filter((w) => w.locationId === location.id);
@@ -50,7 +51,9 @@ export default async function Home() {
       reasons: rawMetrics?.reasons ?? [],
       recommendedAction: rawMetrics?.recommendedAction ?? [],
       rainfall72h: rawMetrics?.rainfall72h ?? waterIntel[0]?.rainfallMm72h ?? 0,
-      reportsCount24h: data.reports.filter((r) => r.locationId === location.id).length,
+      reportsCount24h: data.reports.filter(
+        (r) => r.locationId === location.id && new Date(r.reportedAt) >= cutoff24h
+      ).length,
       waterSources: location.waterSources.map((source) => {
         const intel = waterIntel.find((w) => w.id === source.id);
         return {
