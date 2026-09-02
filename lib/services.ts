@@ -1,4 +1,6 @@
-import { Prisma, RiskLevel } from "@prisma/client";
+import { Prisma, RiskLevel, type AlertPriority } from "@prisma/client";
+import { decideAlertAction } from "./alert-lifecycle";
+import { buildScenarioCleanupFilters } from "./scenario-cleanup";
 import { subDays, subHours } from "date-fns";
 import { reportSchema, waterQualityObservationSchema, type ReportInput, type WaterQualityInput } from "./contracts";
 import { prisma } from "./prisma";
@@ -8,6 +10,10 @@ import { computeDiseaseSignals } from "./disease-engine";
 import { computeWaterRisk } from "./water-risk-engine";
 import { computePriority } from "./alert-priority-engine";
 import { detectLanguage, extractSymptoms, extractDurationDays, parseVoiceReport } from "./voice-intake";
+
+export type { AlertDecision, ActiveAlertLike } from "./alert-lifecycle";
+export { decideAlertAction } from "./alert-lifecycle";
+export { buildScenarioCleanupFilters } from "./scenario-cleanup";
 
 export async function createSymptomReport(input: ReportInput) {
   const parsed = reportSchema.parse(input);
@@ -233,28 +239,75 @@ export async function recalculateLocationRisk(locationId: string) {
     risk.warningLevel === "EARLY_WARNING" ||
     risk.warningLevel === "OUTBREAK";
 
-  if (shouldAlert) {
-    const priorityChanged = existingOpenAlert && existingOpenAlert.priority !== risk.priority;
-    const escalated = existingOpenAlert && risk.score - existingOpenAlert.score >= 8;
-    const levelChanged = existingOpenAlert && risk.level !== existingOpenAlert.level;
-    const newBaseline = !existingOpenAlert;
+  const decision = decideAlertAction({
+    shouldAlert,
+    existing: existingOpenAlert
+      ? {
+          level: existingOpenAlert.level,
+          score: existingOpenAlert.score,
+          priority: existingOpenAlert.priority,
+          warningLevel: existingOpenAlert.warningLevel,
+          status: existingOpenAlert.status,
+        }
+      : null,
+    riskScoreId: score.id,
+    locationName: location.name,
+    level: risk.level,
+    score: risk.score,
+    priority: risk.priority,
+    confidence: risk.confidence,
+    warningLevel: risk.warningLevel,
+    message: risk.reasoning,
+    recommendedAction: risk.recommendedAction.join(" · "),
+  });
 
-    if (newBaseline || escalated || levelChanged || priorityChanged) {
-      await prisma.alert.create({
-        data: {
+  if (decision.action === "create") {
+    await prisma.alert.create({
+      data: {
+        locationId: location.id,
+        riskScoreId: score.id,
+        level: risk.level,
+        score: risk.score,
+        priority: risk.priority,
+        confidence: risk.confidence,
+        warningLevel: risk.warningLevel,
+        title: `${risk.priority === "P0" ? "Immediate" : risk.priority === "P1" ? "Urgent verification" : risk.priority === "P2" ? "Monitor" : "Info"} · ${risk.warningLevel} · ${risk.level} risk in ${location.name}`,
+        message: risk.reasoning,
+        recommendedAction: risk.recommendedAction.join(" · "),
+      },
+    });
+  } else if (decision.action === "update") {
+    await prisma.alert.update({
+      where: { id: existingOpenAlert!.id },
+      data: {
+        riskScoreId: decision.riskScoreId,
+        level: decision.level,
+        score: decision.score,
+        priority: decision.priority as AlertPriority,
+        confidence: decision.confidence,
+        warningLevel: decision.warningLevel,
+        title: decision.title,
+        message: decision.message,
+        recommendedAction: decision.recommendedAction,
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actor: "risk-engine",
+        action: "alert.escalated",
+        entity: "Alert",
+        entityId: existingOpenAlert!.id,
+        metadata: {
           locationId: location.id,
-          riskScoreId: score.id,
-          level: risk.level,
-          score: risk.score,
-          priority: risk.priority,
-          confidence: risk.confidence,
-          warningLevel: risk.warningLevel,
-          title: `${risk.priority === "P0" ? "Immediate" : risk.priority === "P1" ? "Urgent verification" : risk.priority === "P2" ? "Monitor" : "Info"} · ${risk.warningLevel} · ${risk.level} risk in ${location.name}`,
-          message: risk.reasoning,
-          recommendedAction: risk.recommendedAction.join(" · "),
+          fromScore: existingOpenAlert!.score,
+          fromLevel: existingOpenAlert!.level,
+          fromPriority: existingOpenAlert!.priority,
+          toScore: risk.score,
+          toLevel: risk.level,
+          toPriority: risk.priority,
         },
-      });
-    }
+      },
+    });
   }
 
   return { location, score, risk, rainfall72h };
@@ -396,15 +449,16 @@ export async function runSimulationScenario(scenario: string, locationId?: strin
   const now = new Date();
   const location = target;
 
-  await prisma.symptomReport.deleteMany({
-    where: { source: "SIMULATION", notes: { contains: "scenario:simulation" } },
-  });
-  await prisma.waterQualityObservation.deleteMany({
-    where: { sampleMethod: "SIMULATION", notes: { contains: "scenario:simulation" } },
-  });
-  await prisma.rainfallObservation.deleteMany({
-    where: { source: "synthetic-scenario" },
-  });
+  // Clean up only this location's earlier simulation evidence. Each delete is
+  // scoped to the target location (directly or via its water sources) so that
+  // scenario data belonging to other locations is never touched.
+  const cleanupFilters = buildScenarioCleanupFilters(
+    location.id,
+    location.waterSources.map((source) => source.id),
+  );
+  await prisma.symptomReport.deleteMany({ where: cleanupFilters.symptomReports });
+  await prisma.waterQualityObservation.deleteMany({ where: cleanupFilters.waterObservations });
+  await prisma.rainfallObservation.deleteMany({ where: cleanupFilters.rainfallObservations });
 
   const waterSource = location.waterSources[0];
   const today = Array.from({ length: 18 });

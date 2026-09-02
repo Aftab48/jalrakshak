@@ -77,10 +77,27 @@ export function simulateWhatIf(base: WhatIfBase, adjustments: WhatIfAdjustments)
   const clusterPoints = Math.round(clamp(adjustments.spatialStrength * 12, 0, 12));
   const uniquePhones = Math.max(1, Math.min(currentCount, adjustments.uniquePhones ?? currentCount));
   const todaySources = ["WHATSAPP", "DASHBOARD", "IVR"];
+
+  // growthRate shapes the *trajectory* of the current report block rather than
+  // adding directly to the score. A high growth concentrates reports into the
+  // last 24h (recent window dominates the prior 25–72h window), so the engine's
+  // computed growth signal — and from there risk → warning → priority — rises.
+  // A low growth spreads reports across the 25–72h window, dampening growth.
+  // Total recent volume (symptomIncrease) is preserved so disease/anomaly/
+  // confidence still respond to the slider.
+  const growth = clamp(adjustments.growthRate, 0, 1);
+  const growthBaselineFraction = 0.15; // even at growth=0 spread a little into the last 24h
+  const recent24hCount = Math.round(currentCount * (growthBaselineFraction + (1 - growthBaselineFraction) * growth));
   for (let index = 0; index < currentCount; index += 1) {
     const clustered = index < clusterPoints;
+    // Recent-24h reports get nearby timestamps; the remainder fill the previous
+    // 25–72h window so the prior rate rises as growth falls.
+    const reportedAt =
+      index < recent24hCount
+        ? subHours(now, 1 + index * (20 / Math.max(1, recent24hCount)))
+        : subHours(now, 25 + (index - recent24hCount) * (44 / Math.max(1, currentCount - recent24hCount)));
     reports.push({
-      reportedAt: subHours(now, index * 2 + 1),
+      reportedAt,
       symptoms: ["diarrhoea", "vomiting", "dehydration", "stomach_pain"],
       phoneHash: `today-${index % Math.max(1, uniquePhones)}`,
       latitude: clustered ? jitterAt(0, 0.0018) : jitterAt(0.004, 0.02),
