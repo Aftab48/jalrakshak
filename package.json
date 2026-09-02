@@ -7,8 +7,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "prisma db push",
-    "db:seed": "node --env-file=.env --import tsx prisma/seed.ts",
+    "db:push": "prisma generate && prisma db push",
+    "db:seed": "prisma generate && node --env-file=.env --import tsx prisma/seed.ts",
     "simulate": "node --env-file=.env --import tsx scripts/run-simulation.ts",
     "test": "node --import tsx --test tests/*.test.ts",
     "security:audit": "npm audit --audit-level=moderate"
