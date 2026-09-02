@@ -521,13 +521,9 @@ export function InteractiveRiskMap({ locations, onSelectLocationForSimulator }: 
                     }`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (selectedId === location.id) {
-                        setSelectedId(null);
-                      } else {
-                        setSelectedId(location.id);
-                        setActiveTab("overview");
-                        onSelectLocationForSimulator?.(location.id);
-                      }
+                      setSelectedId(location.id);
+                      setActiveTab("overview");
+                      onSelectLocationForSimulator?.(location.id);
                     }}
                     onMouseEnter={() => setHoveredId(location.id)}
                     onMouseLeave={() => setHoveredId(null)}

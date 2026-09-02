@@ -37,9 +37,11 @@ function asNumber(value: string, min: number, max: number) {
 export function WhatIfSimulator({
   locationId,
   locations = [],
+  syncKey,
 }: {
   locationId?: string;
   locations?: { id: string; name: string; district: string }[];
+  syncKey?: number;
 }) {
   const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
   const currentLocId = selectedLocId ?? locationId ?? locations[0]?.id;
@@ -48,7 +50,7 @@ export function WhatIfSimulator({
   // selection), discard the stale local override so the prop takes effect.
   useEffect(() => {
     setSelectedLocId(null);
-  }, [locationId]);
+  }, [locationId, syncKey]);
   const [preset, setPreset] = useState<ScenarioId | "CUSTOM">("CUSTOM");
   const [adjustments, setAdjustments] = useState<WhatIfAdjustments>({ ...DEFAULT_WHAT_IF });
   const [result, setResult] = useState<WhatIfResult | null>(null);

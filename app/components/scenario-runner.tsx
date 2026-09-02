@@ -10,9 +10,11 @@ const initialState: ScenarioActionState = { ok: true, message: "" };
 export function ScenarioRunner({
   locationId,
   locations = [],
+  syncKey,
 }: {
   locationId?: string;
   locations?: { id: string; name: string; district: string }[];
+  syncKey?: number;
 }) {
   const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
   const currentLocId = selectedLocId ?? locationId ?? locations[0]?.id;
@@ -21,7 +23,7 @@ export function ScenarioRunner({
   // selection), discard the stale local override so the prop takes effect.
   useEffect(() => {
     setSelectedLocId(null);
-  }, [locationId]);
+  }, [locationId, syncKey]);
   const [scenario, setScenario] = useState<ScenarioId>("TRUE_OUTBREAK");
   const [state, setState] = useState<ScenarioActionState>(initialState);
   const [pending, startTransition] = useTransition();

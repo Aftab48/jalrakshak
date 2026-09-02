@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
 import {
   Activity,
@@ -248,12 +248,22 @@ export function DashboardView({
 
   // Simulator target location — updated by map marker clicks or resets when scope changes
   const [selectedSimLocationId, setSelectedSimLocationId] = useState<string | undefined>(undefined);
+  // Monotonically-increasing generation counter — bumped on every map pick
+  // (including repeated same-ID picks) and on every scope change so children's
+  // useEffect always fires even when locationId hasn't changed.
+  const [simSyncGen, setSimSyncGen] = useState(0);
 
   // Reset simulator selection whenever the active scope changes so a stale map
   // pick from a previous district/location filter cannot bleed through.
   useEffect(() => {
     setSelectedSimLocationId(undefined);
+    setSimSyncGen((g) => g + 1);
   }, [selectedFilter]);
+
+  const handleMapLocationSelect = useCallback((id: string) => {
+    setSelectedSimLocationId(id);
+    setSimSyncGen((g) => g + 1);
+  }, []);
 
   // Target Location ID for Simulator/Runner — map pick wins, then scope default
   const targetLocationId = selectedSimLocationId ?? activeLocations[0]?.id ?? locations[0]?.id;
@@ -456,7 +466,7 @@ export function DashboardView({
 
             <InteractiveRiskMap
               locations={activeLocations.length > 0 ? activeLocations : locations}
-              onSelectLocationForSimulator={setSelectedSimLocationId}
+              onSelectLocationForSimulator={handleMapLocationSelect}
             />
           </div>
 
@@ -621,12 +631,14 @@ export function DashboardView({
           {/* What-If Simulator with Dynamic Location Support */}
           <WhatIfSimulator
             locationId={targetLocationId}
+            syncKey={simSyncGen}
             locations={rawLocations.map((loc) => ({ id: loc.id, name: loc.name, district: loc.district }))}
           />
 
           {/* Scenario Runner with Dynamic Location Support */}
           <ScenarioRunner
             locationId={targetLocationId}
+            syncKey={simSyncGen}
             locations={rawLocations.map((loc) => ({ id: loc.id, name: loc.name, district: loc.district }))}
           />
 
