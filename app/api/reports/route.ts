@@ -47,8 +47,15 @@ async function parseTwilioForm(request: NextRequest) {
   const message = params.Body ?? "";
   const symptoms = message
     .toLowerCase()
-    .split(/[\s,;]+/)
-    .filter((token) => ["diarrhoea", "vomiting", "fever", "dehydration", "jaundice"].includes(token));
+    .split(/[\s,;。]+/)
+    .map((token) => token.trim().replace(/-/g, "_"))
+    .filter((token) =>
+      ["diarrhoea", "vomiting", "fever", "stomach_pain", "stomach", "pain", "dehydration", "jaundice", "rash", "headache", "weakness", "fatigue", "nausea", "body_ache", "body", "ache", "loss_of_appetite"].includes(token),
+    )
+    .map((token) =>
+      token === "stomach" || token === "pain" ? "stomach_pain" : token === "body" || token === "ache" ? "body_ache" : token,
+    )
+    .filter((token, index, all) => all.indexOf(token) === index);
 
   return {
     locationId: params.LocationId,

@@ -11,7 +11,21 @@ type LocationOption = {
 };
 
 const initialState: ActionState = { ok: true, message: "" };
-const symptoms = ["diarrhoea", "vomiting", "fever", "stomach_pain", "dehydration", "jaundice"];
+const symptoms = [
+  "diarrhoea",
+  "vomiting",
+  "fever",
+  "stomach_pain",
+  "dehydration",
+  "jaundice",
+  "rash",
+  "headache",
+  "weakness",
+  "fatigue",
+  "nausea",
+  "body_ache",
+  "loss_of_appetite",
+];
 
 export function ReportForm({ locations }: { locations: LocationOption[] }) {
   const [state, action, pending] = useActionState(submitManualReport, initialState);

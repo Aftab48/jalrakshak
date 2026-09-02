@@ -5,9 +5,20 @@ import { env } from "./env";
 
 const requestHits = new Map<string, { count: number; resetAt: number }>();
 
+/**
+ * Deterministic pseudonymous reporter identifier.
+ *
+ * HMAC-SHA256(normalizedPhone, serverSecret) is used instead of plain SHA-256 so
+ * the digest is keyed by a server-side secret. Storing the hash still means a
+ * given phone maps to a stable, non-reversible identifier; raw phone numbers are
+ * never persisted or exposed on the dashboard. This is a security-conscious
+ * prototype architecture — not a claim of production-grade security.
+ */
 export function hashPhone(value: string) {
   const normalized = value.replace(/[^\d+]/g, "");
-  return crypto.createHash("sha256").update(normalized).digest("hex");
+  const secret =
+    process.env.PHONE_HASH_SECRET ?? env.INTERNAL_API_KEY;
+  return crypto.createHmac("sha256", secret).update(normalized).digest("hex");
 }
 
 export function clientIp(request: NextRequest) {
