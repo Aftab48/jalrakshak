@@ -1878,3 +1878,206 @@ textarea:focus {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   Global Location & Region Selector Styles
+   ========================================================================== */
+
+.topbar-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.location-selector-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.location-selector-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent-dark);
+}
+
+.location-select-container {
+  position: relative;
+  min-width: 260px;
+}
+
+.global-location-select {
+  width: 100%;
+  appearance: none;
+  background: #ffffff;
+  border: 1.5px solid var(--accent);
+  border-radius: 7px;
+  padding: 8px 34px 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 680;
+  color: var(--foreground);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(34, 124, 112, 0.1);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.global-location-select:focus {
+  border-color: var(--accent-dark);
+  box-shadow: 0 0 0 3px rgba(34, 124, 112, 0.2);
+}
+
+.global-location-select optgroup {
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.global-location-select option {
+  font-weight: 500;
+  color: var(--foreground);
+  padding: 6px;
+}
+
+.select-arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* District Quick Chips Bar */
+.district-quick-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0 16px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+
+.quick-bar-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.quick-bar-sub {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.quick-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+  margin: 0 4px;
+}
+
+.district-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #f8faf6;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.district-chip:hover {
+  background: #eef2ea;
+  color: var(--foreground);
+}
+
+.district-chip.active {
+  background: #e6efe9;
+  border-color: var(--accent);
+  color: var(--accent-dark);
+  font-weight: 750;
+}
+
+.district-chip.future {
+  border-style: dashed;
+  color: #718096;
+}
+
+.district-chip.future.active {
+  border-style: solid;
+  background: #e2e8f0;
+  color: #2d3748;
+}
+
+/* Future Region Placeholder Banner */
+.future-region-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  background: #eef5f3;
+  border: 1.5px dashed var(--accent);
+  margin-bottom: 20px;
+}
+
+.future-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.future-banner-content h3 {
+  font-size: 1rem;
+  font-weight: 750;
+  margin: 0 0 4px;
+  color: var(--accent-dark);
+}
+
+.future-banner-content p {
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin: 0;
+}
+
+.future-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.primary-button.mini,
+.ghost-button.mini {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+}
+
+.location-select-box {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 7px 10px;
+  font-size: 0.78rem;
+  color: var(--foreground);
+}
+

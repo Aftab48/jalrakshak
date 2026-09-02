@@ -7,7 +7,15 @@ import { SCENARIOS, type ScenarioId } from "@/lib/simulation-presets";
 
 const initialState: ScenarioActionState = { ok: true, message: "" };
 
-export function ScenarioRunner({ locationId }: { locationId?: string }) {
+export function ScenarioRunner({
+  locationId,
+  locations = [],
+}: {
+  locationId?: string;
+  locations?: { id: string; name: string; district: string }[];
+}) {
+  const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
+  const currentLocId = selectedLocId ?? locationId ?? locations[0]?.id;
   const [scenario, setScenario] = useState<ScenarioId>("TRUE_OUTBREAK");
   const [state, setState] = useState<ScenarioActionState>(initialState);
   const [pending, startTransition] = useTransition();
@@ -15,7 +23,7 @@ export function ScenarioRunner({ locationId }: { locationId?: string }) {
   const run = () => {
     setState(initialState);
     startTransition(async () => {
-      setState(await runSimulationScenarioAction({ scenario, locationId }));
+      setState(await runSimulationScenarioAction({ scenario, locationId: currentLocId }));
     });
   };
 
@@ -25,6 +33,26 @@ export function ScenarioRunner({ locationId }: { locationId?: string }) {
     <div className="control-panel">
       <div className="section-kicker">Scenario runner</div>
       <p className="scenario-description">{meta.description}</p>
+
+      {locations.length > 0 && (
+        <label className="sim-slider">
+          <span>
+            Target Location
+            <em>{locations.find((l) => l.id === currentLocId)?.name ?? "Select zone"}</em>
+          </span>
+          <select
+            value={currentLocId ?? ""}
+            onChange={(event) => setSelectedLocId(event.target.value)}
+            className="location-select-box"
+          >
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.name} ({loc.district})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="sim-slider">
         <span>

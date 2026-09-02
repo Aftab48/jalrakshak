@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
+
 import { Play, Sparkles } from "lucide-react";
 import { simulateWhatIfAction } from "../actions";
 import {
@@ -32,7 +34,15 @@ function asNumber(value: string, min: number, max: number) {
   return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : min;
 }
 
-export function WhatIfSimulator({ locationId }: { locationId?: string }) {
+export function WhatIfSimulator({
+  locationId,
+  locations = [],
+}: {
+  locationId?: string;
+  locations?: { id: string; name: string; district: string }[];
+}) {
+  const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
+  const currentLocId = selectedLocId ?? locationId ?? locations[0]?.id;
   const [preset, setPreset] = useState<ScenarioId | "CUSTOM">("CUSTOM");
   const [adjustments, setAdjustments] = useState<WhatIfAdjustments>({ ...DEFAULT_WHAT_IF });
   const [result, setResult] = useState<WhatIfResult | null>(null);
@@ -53,7 +63,7 @@ export function WhatIfSimulator({ locationId }: { locationId?: string }) {
   const project = () => {
     setError(null);
     startTransition(async () => {
-      const state = await simulateWhatIfAction({ ...adjustments, locationId });
+      const state = await simulateWhatIfAction({ ...adjustments, locationId: currentLocId });
       if (state.ok && state.result) {
         setResult(state.result);
       } else {
@@ -97,6 +107,26 @@ export function WhatIfSimulator({ locationId }: { locationId?: string }) {
           Custom
         </button>
       </div>
+
+      {locations.length > 0 && (
+        <label className="sim-slider">
+          <span>
+            Target Location
+            <em>{locations.find((l) => l.id === currentLocId)?.name ?? "Select zone"}</em>
+          </span>
+          <select
+            value={currentLocId ?? ""}
+            onChange={(e) => setSelectedLocId(e.target.value)}
+            className="location-select-box"
+          >
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.name} ({loc.district})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="sim-sliders">
         <SimSlider
