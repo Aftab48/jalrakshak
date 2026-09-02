@@ -50,6 +50,28 @@ enum WaterSourceStatus {
   CONTAMINATED
 }
 
+enum WarningLevel {
+  NORMAL
+  WATCH
+  EARLY_WARNING
+  OUTBREAK
+}
+
+enum AlertPriority {
+  P0
+  P1
+  P2
+  P3
+}
+
+enum SampleMethod {
+  FIELD_TEST
+  LAB
+  SENSOR
+  DEMO
+  SIMULATION
+}
+
 model Location {
   id                 String                @id @default(cuid())
   name               String
@@ -83,6 +105,7 @@ model WaterSource {
   notes          String?
   location       Location          @relation(fields: [locationId], references: [id], onDelete: Cascade)
   reports        SymptomReport[]
+  qualityObservations WaterQualityObservation[]
 
   @@index([locationId, status])
 }
@@ -103,6 +126,7 @@ model SymptomReport {
   longitude        Decimal?     @db.Decimal(9, 6)
   notes            String?
   duplicateOfId    String?
+  syndromeSignal   Json?
   location         Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
   waterSource      WaterSource? @relation(fields: [waterSourceId], references: [id], onDelete: SetNull)
 
@@ -123,6 +147,24 @@ model RainfallObservation {
   @@index([locationId, observedAt])
 }
 
+model WaterQualityObservation {
+  id            String           @id @default(cuid())
+  waterSourceId String
+  observedAt    DateTime         @default(now())
+  turbidityNTU  Float?
+  ph            Float?
+  tds           Float?
+  freeChlorine  Float?
+  ecoliDetected Boolean?
+  inspectionScore Int?
+  sampleMethod  SampleMethod     @default(DEMO)
+  confidence    Float            @default(0.5)
+  notes         String?
+  waterSource   WaterSource      @relation(fields: [waterSourceId], references: [id], onDelete: Cascade)
+
+  @@index([waterSourceId, observedAt])
+}
+
 model RiskScore {
   id          String    @id @default(cuid())
   locationId  String
@@ -131,6 +173,11 @@ model RiskScore {
   windowHours Int       @default(72)
   factors     Json
   reasoning   String
+  confidence  Int       @default(50)
+  warningLevel WarningLevel @default(NORMAL)
+  priority    AlertPriority @default(P3)
+  dominantSyndrome String @default("none")
+  rawMetrics  Json?
   computedAt  DateTime  @default(now())
   location    Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
   alerts      Alert[]
@@ -148,6 +195,9 @@ model Alert {
   title          String
   message        String
   recommendedAction String
+  priority       AlertPriority @default(P3)
+  confidence     Int         @default(50)
+  warningLevel   WarningLevel @default(NORMAL)
   triggeredAt    DateTime    @default(now())
   acknowledgedAt DateTime?
   resolvedAt     DateTime?

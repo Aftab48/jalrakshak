@@ -9,10 +9,11 @@ Citizen and health-worker reports enter through `/api/reports`, dashboard server
 The stack is intentionally simple for a hackathon build:
 
 - Next.js App Router for UI, backend routes, and server actions
-- Prisma with Neon Postgres
+- Prisma with Neon/PostgreSQL
 - Zod validation on all intake surfaces
-- Deterministic risk scoring in `lib/risk-engine.ts`
-- Seeded synthetic monsoon and symptom data for a defensible demo
+- A modular, **fully explainable** early-warning engine in `lib/` (anomaly, disease, water-risk, spatial, confidence, alert-priority, early-warning)
+- Seeded synthetic monsoon, water-quality, and symptom data for a defensible demo
+- A deterministic what-if simulator and 8 validated scenario contracts that run the real engine
 
 ## Data Model
 
@@ -28,23 +29,48 @@ Core tables:
 
 ## Risk Engine
 
-The score is explainable rather than black-box:
+The risk output is explainable rather than black-box. JalRakshak V2 runs a modular early-warning pipeline rather than a single fixed formula:
 
 ```text
-risk = symptom cluster + growth rate + rainfall + water-source risk + recency + vulnerability - duplicate penalty
+symptom reports + rainfall + water quality + water source status
+  → anomaly engine      (rolling 14-day z-score baseline → NORMAL/WATCH/EARLY_WARNING/STRONG_ANOMALY)
+  → trend               (growth of 24h rate vs prior window)
+  → disease engine      (symptom patterns → dominant syndrome + percent)
+  → water-risk engine   (turbidity · free chlorine · E. coli · pH · TDS · inspection · rainfall → 0-100)
+  → spatial engine      (Haversine clustering on the 72h window → cluster strength in households)
+  → early-warning engine (weighted warningIndex → NORMAL/WATCH/EARLY_WARNING/OUTBREAK)
+  → risk engine         (weighted 7-factor score 0-100 → LOW/MODERATE/HIGH/CRITICAL)
+  → confidence engine   (evidence quality score, decoupled from risk)
+  → alert-priority engine (P0/P1/P2/P3 from risk × confidence × exposure × vulnerability × growth)
 ```
 
-The output is a 0-100 score, a level, factor breakdown, confidence, plain-English reasoning, and recommended field action. This is easier to defend in front of judges than an overclaimed ML model.
+Key principle: **risk ≠ confidence**. A contaminated-source early-water signal can carry HIGH risk with moderate evidence, while a duplicate-report flood produces HIGH risk but LOW confidence and never reaches P0. Every result ships normalized factors, raw metrics, a confidence breakdown, reasons, and a recommended field action — easy to defend in front of judges.
+
+## Verification & Simulation
+
+The eight demo scenarios drive the **real** engine and are validated by `scripts/run-simulation.ts` (`npm run simulate`) and `tests/engines.test.ts` (`npm test`). Inputs use a seeded PRNG (`SIMULATION_SEED`, default 1) so results are reproducible:
+
+| Scenario | Expected |
+|----------|----------|
+| `TRUE_OUTBREAK` | OUTBREAK / CRITICAL, P0 |
+| `HEAVY_RAIN_ONLY` | WATCH / MODERATE (no outbreak from rain alone) |
+| `WATER_CONTAMINATION_ONLY` | EARLY_WARNING |
+| `SEASONAL_INCREASE` | NORMAL / MODERATE (baseline absorbs seasonality) |
+| `DUPLICATE_REPORT_ATTACK` | P1 (confidence drops under duplication) |
+| `SENSOR_DATA_FAILURE` | NORMAL, low confidence |
+| `HIDDEN_OUTBREAK` | EARLY_WARNING via indirect signals |
+| `MULTIPLE_HOTSPOTS` | OUTBREAK / CRITICAL, P0 |
 
 ## Local Setup
 
-The local `.env` contains the Neon connection string and is ignored by git.
+The local `.env` contains the database connection string and is ignored by git.
 
 ```bash
 npm install
 npm run db:push
 npm run db:seed
-npm run simulate
+npm test          # 13 engine + scenario-contract tests
+npm run simulate  # 8 scenario contracts, deterministic
 npm run dev
 ```
 
@@ -74,7 +100,7 @@ Requires `x-internal-api-key`. Recalculates one location when `locationId` is su
 ## Security Pass
 
 - Secrets are isolated in `.env`, already covered by `.gitignore`
-- Phone numbers are SHA-256 hashed before storage
+- Phone numbers are **HMAC-SHA256** hashed (keyed pseudonymisation) before storage — raw numbers never stored
 - Zod validates external and dashboard intake
 - Report endpoint has an in-memory rate limiter for demo safety
 - Twilio signature validation is supported when `TWILIO_AUTH_TOKEN` is configured
