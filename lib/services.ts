@@ -1,5 +1,5 @@
 import { Prisma, RiskLevel, type AlertPriority } from "@prisma/client";
-import { decideAlertAction } from "./alert-lifecycle";
+import { decideAlertAction, PRIORITY_WEIGHT, WARNING_SEVERITY, LEVEL_SEVERITY } from "./alert-lifecycle";
 import { buildScenarioCleanupFilters } from "./scenario-cleanup";
 import { subDays, subHours } from "date-fns";
 import { reportSchema, waterQualityObservationSchema, type ReportInput, type WaterQualityInput } from "./contracts";
@@ -277,6 +277,14 @@ export async function recalculateLocationRisk(locationId: string) {
       },
     });
   } else if (decision.action === "update") {
+    // Set the re-opened state only when this is a material escalation of an
+    // alert that had already been acknowledged. That old acknowledgement
+    // applied to the previous, less urgent state; a material escalation means
+    // the current state needs a fresh acknowledgement. Preserve the original
+    // triggeredAt (incident creation time) and clear the stale acknowledgement.
+    const escalatedFromAcknowledged =
+      decision.escalation && existingOpenAlert!.status === "ACKNOWLEDGED";
+
     await prisma.alert.update({
       where: { id: existingOpenAlert!.id },
       data: {
@@ -289,22 +297,30 @@ export async function recalculateLocationRisk(locationId: string) {
         title: decision.title,
         message: decision.message,
         recommendedAction: decision.recommendedAction,
+        ...(escalatedFromAcknowledged
+          ? { status: "OPEN" as const, acknowledgedAt: null }
+          : {}),
       },
     });
     await prisma.auditLog.create({
       data: {
         actor: "risk-engine",
-        action: "alert.escalated",
+        action: escalatedFromAcknowledged ? "alert.reopened" : "alert.escalated",
         entity: "Alert",
         entityId: existingOpenAlert!.id,
         metadata: {
           locationId: location.id,
+          fromStatus: existingOpenAlert!.status,
+          toStatus: escalatedFromAcknowledged ? "OPEN" : existingOpenAlert!.status,
           fromScore: existingOpenAlert!.score,
           fromLevel: existingOpenAlert!.level,
           fromPriority: existingOpenAlert!.priority,
+          fromWarningLevel: existingOpenAlert!.warningLevel,
           toScore: risk.score,
           toLevel: risk.level,
           toPriority: risk.priority,
+          toWarningLevel: risk.warningLevel,
+          reason: escalatedFromAcknowledged ? "Material risk escalation after acknowledgement" : "Risk intelligence update",
         },
       },
     });
@@ -329,8 +345,26 @@ export async function getDashboardData() {
       where: { status: { in: ["OPEN", "ACKNOWLEDGED"] } },
       include: { location: true },
       orderBy: { triggeredAt: "desc" },
-      take: 40,
-    }),
+      take: 200,
+    }).then((alerts) =>
+      // Order the active queue by *current* urgency, not creation time. An old
+      // incident that was materially escalated to P0/P1 must not sit below a
+      // newer, less urgent alert. Priority → warning severity → risk level →
+      // score → recency, with OPEN always ahead of ACKNOWLEDGED.
+      [...alerts].sort((a, b) => {
+        const activeA = a.status === "OPEN" ? 1 : 0;
+        const activeB = b.status === "OPEN" ? 1 : 0;
+        if (activeA !== activeB) return activeB - activeA;
+        const pw = (PRIORITY_WEIGHT[b.priority] ?? 0) - (PRIORITY_WEIGHT[a.priority] ?? 0);
+        if (pw !== 0) return pw;
+        const ws = (WARNING_SEVERITY[b.warningLevel] ?? 0) - (WARNING_SEVERITY[a.warningLevel] ?? 0);
+        if (ws !== 0) return ws;
+        const lv = (LEVEL_SEVERITY[b.level] ?? 0) - (LEVEL_SEVERITY[a.level] ?? 0);
+        if (lv !== 0) return lv;
+        if (b.score !== a.score) return b.score - a.score;
+        return b.triggeredAt.getTime() - a.triggeredAt.getTime();
+      }),
+    ),
     prisma.symptomReport.findMany({
       include: { location: true, waterSource: true },
       orderBy: { reportedAt: "desc" },

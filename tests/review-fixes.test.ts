@@ -163,10 +163,13 @@ test("alert: a resolved/closed alert allows a genuinely new incident alert", () 
   assert.equal(decide({ existing: dismissed }).action, "create");
 });
 
-test("alert: acknowledged alert is superseded (updated) when its risk escalates", () => {
+test("alert: acknowledged alert is superseded (updated+reopened) when its risk escalates", () => {
   const acknowledged: ActiveAlertLike = { ...baseExisting, status: "ACKNOWLEDGED" };
   const decision = decide({ existing: acknowledged, score: 90, priority: "P0", level: "CRITICAL", warningLevel: "OUTBREAK" });
   assert.equal(decision.action, "update");
+  if (decision.action === "update") {
+    assert.equal(decision.escalation, true, "material escalation must flag reopening");
+  }
 });
 
 test("alert: no alert when the risk does not warrant one", () => {
