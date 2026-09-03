@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const verificationSchema = z.object({
@@ -36,8 +37,8 @@ export async function POST(request: NextRequest) {
         waterSourceId: parsed.waterSourceId ?? undefined,
         waterCondition: parsed.waterCondition ?? undefined,
         notes: parsed.notes,
-        latitude: parsed.latitude !== undefined ? new (await import("@prisma/client")).Prisma.Decimal(parsed.latitude) : undefined,
-        longitude: parsed.longitude !== undefined ? new (await import("@prisma/client")).Prisma.Decimal(parsed.longitude) : undefined,
+        latitude: parsed.latitude != null ? new Prisma.Decimal(parsed.latitude) : undefined,
+        longitude: parsed.longitude != null ? new Prisma.Decimal(parsed.longitude) : undefined,
         verifiedBy: parsed.verifiedBy,
       },
     });
