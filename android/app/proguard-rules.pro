@@ -1,0 +1,5 @@
+-dontwarn okhttp3.**
+-dontwarn retrofit2.**
+-dontwarn kotlinx.serialization.**
+-keep class com.jalrakshak.field.data.remote.dto.** { *; }
+-keepattributes *Annotation*
