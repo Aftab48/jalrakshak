@@ -265,8 +265,11 @@ export function DashboardView({
     setSimSyncGen((g) => g + 1);
   }, []);
 
-  // Target Location ID for Simulator/Runner — map pick wins, then scope default
-  const targetLocationId = selectedSimLocationId ?? activeLocations[0]?.id ?? locations[0]?.id;
+  // Target Location ID for Simulator/Runner — map pick wins, then scope default.
+  // No fallback to the unfiltered `locations` list: an empty scope (e.g. an
+  // external future region with no monitored locations) must leave this
+  // undefined rather than silently targeting an unrelated real location.
+  const targetLocationId = selectedSimLocationId ?? activeLocations[0]?.id;
 
   return (
     <main className="app-shell">
@@ -629,17 +632,20 @@ export function DashboardView({
           </div>
 
           {/* What-If Simulator with Dynamic Location Support */}
+          {/* `locations` is scope-filtered (activeLocations), not the raw
+              full list — an empty scope must leave both the dropdown and
+              the child's own internal fallback with nothing to pick. */}
           <WhatIfSimulator
             locationId={targetLocationId}
             syncKey={simSyncGen}
-            locations={rawLocations.map((loc) => ({ id: loc.id, name: loc.name, district: loc.district }))}
+            locations={activeLocations.map((loc) => ({ id: loc.id, name: loc.name, district: loc.district }))}
           />
 
           {/* Scenario Runner with Dynamic Location Support */}
           <ScenarioRunner
             locationId={targetLocationId}
             syncKey={simSyncGen}
-            locations={rawLocations.map((loc) => ({ id: loc.id, name: loc.name, district: loc.district }))}
+            locations={activeLocations.map((loc) => ({ id: loc.id, name: loc.name, district: loc.district }))}
           />
 
           {/* Symptom Intake Form */}

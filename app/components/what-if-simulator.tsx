@@ -202,10 +202,14 @@ export function WhatIfSimulator({
         E. coli positive sample
       </label>
 
-      <button className="primary-button" onClick={project} disabled={pending}>
+      <button className="primary-button" onClick={project} disabled={pending || !currentLocId}>
         <Play size={17} />
         {pending ? "Projecting" : "Run projection"}
       </button>
+
+      {!currentLocId ? (
+        <p className="form-note bad">No monitored location in this scope — select a different region to run a projection.</p>
+      ) : null}
 
       {error ? <p className="form-note bad">{error}</p> : null}
 

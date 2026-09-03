@@ -76,10 +76,14 @@ export function ScenarioRunner({
         </select>
       </label>
 
-      <button className="primary-button" onClick={run} disabled={pending}>
+      <button className="primary-button" onClick={run} disabled={pending || !currentLocId}>
         <FlaskConical size={17} />
         {pending ? "Injecting synthetic data" : "Apply scenario to live system"}
       </button>
+
+      {!currentLocId ? (
+        <p className="form-note bad">No monitored location in this scope — select a different region to run a scenario.</p>
+      ) : null}
 
       {state.message ? <p className={state.ok ? "form-note good" : "form-note bad"}>{state.message}</p> : null}
 

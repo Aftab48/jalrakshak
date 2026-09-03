@@ -37,6 +37,7 @@ The static map schematic and single-location dashboard view from 0.2.0 are repla
 - **React Compiler Purity**: Replaced render-time `Date.now()` with pure per-location `reportsCount24h` reduction in `DashboardView`.
 - **State Synchronization**: Replaced effect-driven `setState` in simulation tools with pure derived state (`selectedLocId ?? locationId ?? default`).
 - **Linter Cleanup**: Resolved unused variable warnings in `app/page.tsx` and `app/components/interactive-risk-map.tsx`.
+- **Empty-Scope Target Leakage**: `targetLocationId` in `DashboardView` no longer falls back to the unfiltered location list when the active scope (e.g. an unseeded future region) has zero monitored locations — it now resolves to `undefined` instead of silently pointing at an unrelated real location. The What-If Simulator and Scenario Runner receive scope-filtered `locations` (not the raw full list) so their own internal fallback can no longer leak a real location either, and both now disable their Run/Apply buttons with an explicit "No monitored location in this scope" note instead of allowing a simulation to fire against the wrong target.
 
 ### Verification
 
