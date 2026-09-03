@@ -48,6 +48,31 @@ The static map schematic and single-location dashboard view from 0.2.0 are repla
 
 ---
 
+## 0.2.1 — Android Field-Worker App Layer (previous)
+
+Adds a native offline-first Android companion app for field verification workers, plus the supporting API surface on the web side. Built on Kotlin + Jetpack Compose with a local Room database and background sync so field workers can capture data with no connectivity and have it flow to the server once back online.
+
+### Added
+
+- **Android app** (`android/`): Kotlin + Jetpack Compose field-worker app (`com.jalrakshak.field`) covering login, home dashboard, alert list/detail with in-app verification, water-source inspection capture, voice-based report intake (mock ASR service, ready to swap for a real one), report submission with photo capture/compression, and a sync-status/settings screen.
+  - **Offline-first local storage**: Room database (`AppDatabase`) with DAOs/entities for alerts, health reports, water inspections, verifications, drafts, and a sync queue.
+  - **Background sync**: `SyncEngine` / `SyncManager` / `SyncWorker` reconcile the local sync queue against the server once network connectivity returns (`NetworkMonitor`).
+  - **Networking**: Retrofit-based `JalRakshakApi` client with auth and API-key interceptors, DTOs, and repository implementations mapping local/remote models.
+- **Android-facing API routes** (`app/api/android/`): `auth/login`, `alerts`, `alerts/[id]`, `alerts/[id]/status`, `locations`, `locations/[id]`, `verifications`, `water-quality`, `water-sources`, `water-sources/[id]` — zod-validated endpoints backing the app's data sync.
+- **Database** (`prisma/schema.prisma`): New `FieldVerification` model (case presence, affected people/households, symptoms, water source/condition, geo-coordinates, `verifiedBy`) linked to `Alert`, capturing field-worker verification submitted from the Android app.
+
+### Fixed
+
+- **Repo hygiene**: Removed committed Gradle build output (`android/app/build`, `android/build`, `android/.gradle`) and `.idea`/`local.properties` caches from tracking; added `android/.gitignore` plus root `.idea/` entry so IDE/build artifacts stay untracked going forward.
+- **Vercel build failure**: `app/api/android/verifications/route.ts` narrowed its optional latitude/longitude guard from `!== undefined` to `!= null` (the zod schema's `.nullish()` fields could pass `null` through to `Prisma.Decimal`, which rejects it) and replaced a fragile per-call `await import("@prisma/client")` with a top-level import.
+
+### Verification
+
+- `npm run build` — succeeds on Vercel after the TypeScript fix.
+- Git Branch — merged into `main` via PR #3.
+
+---
+
 ## 0.2.0 — Explainable Early-Warning Engine (previous)
 
 The static six-factor risk score from 0.1.0 is replaced by a modular, explainable early-warning pipeline. The headline change: **risk is decoupled from evidence confidence**, and the two are combined into an alert priority (P0–P3). This makes the system safer against duplicate-report floods (high risk but low confidence → never P0) and more informative (a contaminated-source signal with moderate evidence still surfaces as an early warning).

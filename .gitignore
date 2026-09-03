@@ -21,6 +21,7 @@
 
 # PostgreSQL data
 .postgres-data/
+*.postgres.log
 # environment / secrets
 .env
 .env.*
