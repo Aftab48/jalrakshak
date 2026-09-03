@@ -1,4 +1,5 @@
 # JalRakshak Version Changelog
+
 ## 0.2.0 — Explainable Early-Warning Engine (current)
 
 The static six-factor risk score from 0.1.0 is replaced by a modular, explainable early-warning pipeline. The headline change: **risk is decoupled from evidence confidence**, and the two are combined into an alert priority (P0–P3). This makes the system safer against duplicate-report floods (high risk but low confidence → never P0) and more informative (a contaminated-source signal with moderate evidence still surfaces as an early warning).

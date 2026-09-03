@@ -203,9 +203,29 @@ model Alert {
   resolvedAt     DateTime?
   location       Location    @relation(fields: [locationId], references: [id], onDelete: Cascade)
   riskScore      RiskScore?  @relation(fields: [riskScoreId], references: [id], onDelete: SetNull)
+  verifications  FieldVerification[]
 
   @@index([status, triggeredAt])
   @@index([locationId, status])
+}
+
+model FieldVerification {
+  id                 String    @id @default(cuid())
+  alertId            String
+  casesPresent       String
+  affectedPeople     Int?
+  affectedHouseholds Int?
+  symptoms           String[]
+  waterSourceId      String?
+  waterCondition     String?
+  notes              String?
+  latitude           Decimal?  @db.Decimal(9, 6)
+  longitude          Decimal?  @db.Decimal(9, 6)
+  verifiedBy         String?
+  createdAt          DateTime  @default(now())
+  alert              Alert     @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId, createdAt])
 }
 
 model AuditLog {
