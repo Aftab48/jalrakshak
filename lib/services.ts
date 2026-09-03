@@ -366,9 +366,10 @@ export async function getDashboardData() {
       }),
     ),
     prisma.symptomReport.findMany({
+      where: { reportedAt: { gte: subHours(new Date(), 24) } },
       include: { location: true, waterSource: true },
       orderBy: { reportedAt: "desc" },
-      take: 24,
+      take: 500,
     }),
     prisma.waterQualityObservation.findMany({
       orderBy: { observedAt: "desc" },

@@ -1,0 +1,15 @@
+services:
+  jalrakshak-db:
+    image: postgres:18
+    container_name: jalrakshak-pg
+    environment:
+      POSTGRES_USER: jal
+      POSTGRES_PASSWORD: jal
+      POSTGRES_DB: jalrakshak
+    ports:
+      - "5433:5432"
+    volumes:
+      - jalrakshak_data:/var/lib/postgresql
+
+volumes:
+  jalrakshak_data:

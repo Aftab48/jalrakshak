@@ -1,6 +1,79 @@
 # JalRakshak Version Changelog
 
-## 0.2.0 — Explainable Early-Warning Engine (current)
+## 0.3.0 — Interactive Geographic Surveillance & Dynamic Multi-Region Intelligence (current)
+
+The static map schematic and single-location dashboard view from 0.2.0 are replaced by an interactive geographic surveillance experience and a global location/region coordinator. Key enhancements include **interactive pan/zoom map canvas with animated radar halos**, **rich 3-tab interactive location popups / inspector drawers**, and a **global location & district selector** that dynamically synchronizes all dashboard panels, metrics, what-if simulations, and synthetic scenario runners.
+
+### Added
+
+- **Interactive Risk Map & Inspector** (`app/components/interactive-risk-map.tsx`):
+  - **Canvas Navigation**: Mouse drag-to-pan, touch pan, mouse-wheel zoom, and floating zoom controls (`+`, `-`, `Reset` with zoom percentage indicator).
+  - **Layer Toggles**: Real-time layer switches for Geographic Roads & Rivers, Risk Radiation Halos, and Water Source Points.
+  - **Interactive Map Markers**: Warning-ringed markers with live score badges, active alert indicator dots (`!`), and micro hover-cards displaying clinical reasoning and evidence confidence.
+  - **Radar Radiation Waves**: SVG radial pulse animations on `OUTBREAK` and `EARLY_WARNING` zones to highlight active disease clusters.
+  - **Interactive 3-Tab Location Inspector / Popup**:
+    - *Risk & Syndromes*: Risk score gauge, warning level pill, alert priority, confidence score, dominant syndrome match, reasoning narrative, and 8-factor progress bars (Syndrome match, Anomaly vs baseline, 24h growth, Water quality, Rainfall, Spatial cluster, Vulnerability, Exposure).
+    - *Water Quality Monitoring*: Source-level observations (turbidity NTU, free chlorine mg/L, E. coli positive/negative detection, sanitary inspection scores, and hazard reasons).
+    - *Active Alerts & Inline Actions*: Location alerts queue with direct *Acknowledge* and *Resolve* action buttons.
+    - *Quick Actions Bar*: Instant jump-to-report form prefill, jump-to-simulator, and recenter-on-map buttons.
+- **Global Location & Multi-Region Coordinator** (`app/components/dashboard-view.tsx`):
+  - **Topbar Location Selector**: Categorized dropdown supporting *All Pilot Belts*, *By District* (`Howrah`, `Kolkata`, `South 24 Parganas`), *By Specific Monitored Zone*, and *Other Regions* pre-configured for future datasets (`Delhi NCR`, `Mumbai Metropolitan`, `Bengaluru Urban`, `Patna District`, `Varanasi Ghats Pocket`, `Jaipur District`).
+  - **District Quick-Filter Toolbar**: 1-click pill buttons for rapid geographic scope switching.
+  - **Synchronized Dashboard Filtering**: Dynamically re-scopes the Overview Metrics Strip, Risk Map, Alert Queue, Explainable Intelligence Scores, Water Intelligence, and Case Reports Feed to the selected location or district.
+  - **Future Region State**: Clean informational banner for unseeded regions indicating channel readiness for sensor ingestion and case reports.
+- **Multi-Location Simulation Controls**:
+  - `app/components/what-if-simulator.tsx` — Target Location selector dropdown allows running what-if risk projections on any monitored zone.
+  - `app/components/scenario-runner.tsx` — Target Location selector dropdown allows injecting synthetic outbreak scenarios into any monitored zone.
+- **Styles** (`app/globals.css`):
+  - Added CSS for interactive map viewport (`cursor: grab/grabbing`), floating zoom controls, radar pulse keyframe animations, hover cards, popup inspector drawer, global location selector dropdown, and district quick-chips.
+
+### Changed
+
+- `app/page.tsx` — Refactored to pass server-fetched surveillance intelligence, water observations, open alerts, and clinical signals into `DashboardView`.
+- `app/components/what-if-simulator.tsx` and `app/components/scenario-runner.tsx` — Synchronized with parent location selection while allowing manual target overrides.
+
+### Fixed
+
+- **React Compiler Purity**: Replaced render-time `Date.now()` with pure per-location `reportsCount24h` reduction in `DashboardView`.
+- **State Synchronization**: Replaced effect-driven `setState` in simulation tools with pure derived state (`selectedLocId ?? locationId ?? default`).
+- **Linter Cleanup**: Resolved unused variable warnings in `app/page.tsx` and `app/components/interactive-risk-map.tsx`.
+- **Empty-Scope Target Leakage**: `targetLocationId` in `DashboardView` no longer falls back to the unfiltered location list when the active scope (e.g. an unseeded future region) has zero monitored locations — it now resolves to `undefined` instead of silently pointing at an unrelated real location. The What-If Simulator and Scenario Runner receive scope-filtered `locations` (not the raw full list) so their own internal fallback can no longer leak a real location either, and both now disable their Run/Apply buttons with an explicit "No monitored location in this scope" note instead of allowing a simulation to fire against the wrong target.
+
+### Verification
+
+- `npx tsc --noEmit` — passes with 0 errors.
+- `npm run lint` — 0 errors, 0 warnings.
+- `npm test` — 44/44 unit and contract tests pass.
+- Git Branch — committed and pushed to `origin/raj`.
+
+---
+
+## 0.2.1 — Android Field-Worker App Layer (previous)
+
+Adds a native offline-first Android companion app for field verification workers, plus the supporting API surface on the web side. Built on Kotlin + Jetpack Compose with a local Room database and background sync so field workers can capture data with no connectivity and have it flow to the server once back online.
+
+### Added
+
+- **Android app** (`android/`): Kotlin + Jetpack Compose field-worker app (`com.jalrakshak.field`) covering login, home dashboard, alert list/detail with in-app verification, water-source inspection capture, voice-based report intake (mock ASR service, ready to swap for a real one), report submission with photo capture/compression, and a sync-status/settings screen.
+  - **Offline-first local storage**: Room database (`AppDatabase`) with DAOs/entities for alerts, health reports, water inspections, verifications, drafts, and a sync queue.
+  - **Background sync**: `SyncEngine` / `SyncManager` / `SyncWorker` reconcile the local sync queue against the server once network connectivity returns (`NetworkMonitor`).
+  - **Networking**: Retrofit-based `JalRakshakApi` client with auth and API-key interceptors, DTOs, and repository implementations mapping local/remote models.
+- **Android-facing API routes** (`app/api/android/`): `auth/login`, `alerts`, `alerts/[id]`, `alerts/[id]/status`, `locations`, `locations/[id]`, `verifications`, `water-quality`, `water-sources`, `water-sources/[id]` — zod-validated endpoints backing the app's data sync.
+- **Database** (`prisma/schema.prisma`): New `FieldVerification` model (case presence, affected people/households, symptoms, water source/condition, geo-coordinates, `verifiedBy`) linked to `Alert`, capturing field-worker verification submitted from the Android app.
+
+### Fixed
+
+- **Repo hygiene**: Removed committed Gradle build output (`android/app/build`, `android/build`, `android/.gradle`) and `.idea`/`local.properties` caches from tracking; added `android/.gitignore` plus root `.idea/` entry so IDE/build artifacts stay untracked going forward.
+- **Vercel build failure**: `app/api/android/verifications/route.ts` narrowed its optional latitude/longitude guard from `!== undefined` to `!= null` (the zod schema's `.nullish()` fields could pass `null` through to `Prisma.Decimal`, which rejects it) and replaced a fragile per-call `await import("@prisma/client")` with a top-level import.
+
+### Verification
+
+- `npm run build` — succeeds on Vercel after the TypeScript fix.
+- Git Branch — merged into `main` via PR #3.
+
+---
+
+## 0.2.0 — Explainable Early-Warning Engine (previous)
 
 The static six-factor risk score from 0.1.0 is replaced by a modular, explainable early-warning pipeline. The headline change: **risk is decoupled from evidence confidence**, and the two are combined into an alert priority (P0–P3). This makes the system safer against duplicate-report floods (high risk but low confidence → never P0) and more informative (a contaminated-source signal with moderate evidence still surfaces as an early warning).
 

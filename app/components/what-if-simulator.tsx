@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
+
+
 import { Play, Sparkles } from "lucide-react";
 import { simulateWhatIfAction } from "../actions";
 import {
@@ -32,7 +34,23 @@ function asNumber(value: string, min: number, max: number) {
   return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : min;
 }
 
-export function WhatIfSimulator({ locationId }: { locationId?: string }) {
+export function WhatIfSimulator({
+  locationId,
+  locations = [],
+  syncKey,
+}: {
+  locationId?: string;
+  locations?: { id: string; name: string; district: string }[];
+  syncKey?: number;
+}) {
+  const [selectedLocId, setSelectedLocId] = useState<string | null>(null);
+  const currentLocId = selectedLocId ?? locationId ?? locations[0]?.id;
+
+  // When the parent-supplied locationId changes (global scope switch or map
+  // selection), discard the stale local override so the prop takes effect.
+  useEffect(() => {
+    setSelectedLocId(null);
+  }, [locationId, syncKey]);
   const [preset, setPreset] = useState<ScenarioId | "CUSTOM">("CUSTOM");
   const [adjustments, setAdjustments] = useState<WhatIfAdjustments>({ ...DEFAULT_WHAT_IF });
   const [result, setResult] = useState<WhatIfResult | null>(null);
@@ -53,7 +71,7 @@ export function WhatIfSimulator({ locationId }: { locationId?: string }) {
   const project = () => {
     setError(null);
     startTransition(async () => {
-      const state = await simulateWhatIfAction({ ...adjustments, locationId });
+      const state = await simulateWhatIfAction({ ...adjustments, locationId: currentLocId });
       if (state.ok && state.result) {
         setResult(state.result);
       } else {
@@ -97,6 +115,26 @@ export function WhatIfSimulator({ locationId }: { locationId?: string }) {
           Custom
         </button>
       </div>
+
+      {locations.length > 0 && (
+        <label className="sim-slider">
+          <span>
+            Target Location
+            <em>{locations.find((l) => l.id === currentLocId)?.name ?? "Select zone"}</em>
+          </span>
+          <select
+            value={currentLocId ?? ""}
+            onChange={(e) => setSelectedLocId(e.target.value)}
+            className="location-select-box"
+          >
+            {locations.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.name} ({loc.district})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <div className="sim-sliders">
         <SimSlider
@@ -164,10 +202,14 @@ export function WhatIfSimulator({ locationId }: { locationId?: string }) {
         E. coli positive sample
       </label>
 
-      <button className="primary-button" onClick={project} disabled={pending}>
+      <button className="primary-button" onClick={project} disabled={pending || !currentLocId}>
         <Play size={17} />
         {pending ? "Projecting" : "Run projection"}
       </button>
+
+      {!currentLocId ? (
+        <p className="form-note bad">No monitored location in this scope — select a different region to run a projection.</p>
+      ) : null}
 
       {error ? <p className="form-note bad">{error}</p> : null}
 
